@@ -20,12 +20,16 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <gli/gli.hpp>
+#include <random>
 
-
+//some basic constants
 using namespace std;
 #define PI 3.14159265
 const float ROTATEDEGREE = 2.0;
 const int ROTATENUM = 360/ROTATEDEGREE;
+const int VASENUM = 10;
+const float diffuseColorEffect = 0.8f;
+const float ambientColorEffect = 0.5f;
 
 struct vertex {
     glm::vec3 position;
@@ -54,6 +58,7 @@ glm::vec3 getNormal(glm::vec3 point1,glm::vec3 point2,glm::vec3 point3) {
 
 vector<vector<vertex>> readProfiles() {
     // This is to read the initial points from the file
+    // and store them into vector of vector
     vector<vector<vertex>> points;
     ifstream file("vase.txt");
     if(file.is_open()) {

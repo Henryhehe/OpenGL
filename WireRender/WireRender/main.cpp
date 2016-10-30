@@ -3,12 +3,14 @@
 //  WireRender
 //
 //  Created by Chuanheng He on 2016-10-29.
+//  Student ID:250825743
 //  Copyright © 2016 Chuanheng He. All rights reserved.
 //
 
 
 #include <iostream>
 #include "basics.h"
+#include <glm/gtx/rotate_vector.hpp>
 #include "Camera.h"
 using namespace std;
 
@@ -18,7 +20,9 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void do_movement();
 
 // Window dimensions
-const GLuint WIDTH = 800, HEIGHT = 600;
+const GLuint WIDTH = 1200, HEIGHT = 800;
+
+int start = 0;
 
 // Camera
 Camera  camera(glm::vec3(0.0f, 0.0f, 3.0f));
@@ -31,7 +35,6 @@ GLfloat deltaTime = 0.0f;	// Time between current frame and last frame
 GLfloat lastFrame = 0.0f;  	// Time of last frame
 
 // Light attributes
-glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 
 //This shader is just basic to get 3d into 2d screen
 const GLchar* vertexShaderSource = "#version 330 core\n"
@@ -71,6 +74,7 @@ const GLchar* fragmentShaderSource = "#version 330 core\n"
 "color = vec4(lightColor * objectColor, 1.0f);\n"
 "}\0";
 
+//This one is applied to the object
 const GLchar* fragmentShaderSource2 = "#version 330 core\n"
 "struct Material {\n"
 "vec3 ambient;\n"
@@ -111,7 +115,15 @@ const GLchar* fragmentShaderSource3 = "#version 330 core\n"
 "out vec4 color;\n"
 "void main()\n"
 "{\n"
-"color = vec4(0.9f);\n"
+"color = vec4(1.0f);\n"
+"}\0";
+//changing light source color
+const GLchar* fragmentShaderSource4 = "#version 330 core\n"
+"out vec4 color;\n"
+"uniform vec4 currentColor;\n"
+"void main()\n"
+"{\n"
+"color = currentColor;\n"
 "}\0";
 
 
@@ -159,10 +171,8 @@ int main(int argc, const char * argv[]) {
     //enaple depth testing
     glEnable(GL_DEPTH_TEST);
     
-    // triangulate step
-    //*********************************
+
     //Setting up the shaders that we use
-    
     // compile the shader
     GLint success;
     GLchar infoLog[512];
@@ -193,9 +203,9 @@ int main(int argc, const char * argv[]) {
     
     GLuint fragmentShader;
     fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader,1,&fragmentShaderSource3,NULL);
+    glShaderSource(fragmentShader,1,&fragmentShaderSource4,NULL);
     glCompileShader(fragmentShader);
-    // Shader Program
+    // Shader Program for the lamp
     GLuint LampProgram;
     LampProgram = glCreateProgram();
     // attch the shader to program created
@@ -256,7 +266,8 @@ int main(int argc, const char * argv[]) {
         0, 1, 3,
         0, 2, 3
     };
-    
+    // triangulate step
+    //*********************************
     int initialPointNum = pointsdate.size();
     int recNum = initialPointNum*ROTATENUM;
     GLuint VBOs[recNum],VAOs[recNum],EBOs[recNum];
@@ -270,6 +281,7 @@ int main(int argc, const char * argv[]) {
   for(int i = 0; i+1 < pointsdate.size(); i = i +1) {
     for(int j = 0; j < ROTATENUM ; j = j + 1) {
 // get points and store them into vertice array as individual rectangle
+// also calcualte the normal vectors and store them into vertices
         glm::vec3 firstPoint = pointsdate[i][j].position;
         glm::vec3 secondPoint = pointsdate[i+1][j].position;
         glm::vec3 thirdPoint = pointsdate[i][j+1].position;
@@ -299,21 +311,28 @@ int main(int argc, const char * argv[]) {
     }
     }
     
-    // Then, we set the light's VAO (VBO stays the same. After all, the vertices are the same for the light object (also a 3D cube))
+    // setting up the VAO, VBO for the light source
     GLuint lightVAO,lightVBO;
     glGenVertexArrays(1, &lightVAO);
     glGenBuffers(1, &lightVBO);
     glBindBuffer(GL_ARRAY_BUFFER,lightVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(lamp), lamp, GL_STATIC_DRAW);
     glBindVertexArray(lightVAO);
-    // We only need to bind to the VBO (to link it with glVertexAttribPointer), no need to fill it; the VBO's data already contains all we need.
     glBindBuffer(GL_ARRAY_BUFFER, lightVBO);
-    // Set the vertex attributes (only position data for the lamp))
+    // Set the vertex attributes 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
     glEnableVertexAttribArray(0);
     glBindVertexArray(0);
     
 
+    //Random colors fun
+    random_device rd;
+    mt19937 gen(rd());
+    glm::vec3 lightColor = glm::vec3(1.0f,1.0f,1.0f);
+    float r,g,b;
+    float z = 1.0f;
+    glm::vec3 lightPos(1.2f, 1.0f, 1.0f);
+     GLfloat timepass = 0.0f;
     //Game loop
     while (!glfwWindowShouldClose(window))
     {
@@ -322,52 +341,60 @@ int main(int argc, const char * argv[]) {
         GLfloat currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
-        
         // Check if any events have been activiated (key pressed, mouse moved etc.) and call corresponding response functions
         glfwPollEvents();
         do_movement();
-
-        // Clear the colorbuffer
-        glClearColor(0.0f, 0.0f, 0.1f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
+        // Clear the colorbuffer
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         // Use cooresponding shader when setting uniforms/drawing objects
         glUseProgram(ourProgram);
         
+        // rotating lightSource
+        if(start) {
+        float rotateDegree = glfwGetTime()*0.05f;
+        lightPos = glm::rotateZ(lightPos, rotateDegree);
         GLint lightPosLoc = glGetUniformLocation(ourProgram, "lightPos");
         glUniform3f(lightPosLoc, lightPos.x, lightPos.y, lightPos.z);
-
-        
-        
-        //setting up the color in the fragment shader
-        GLint objectColorLoc = glGetUniformLocation(ourProgram, "objectColor");
-        GLint lightColorLoc  = glGetUniformLocation(ourProgram, "lightColor");
-        glUniform3f(objectColorLoc, 1.0f, 0.5f, 0.31f);
-        glUniform3f(lightColorLoc,  1.0f, 1.0f, 1.0f);
-        
+        int timeStep1 = (int)glfwGetTime();
+        if(timeStep1%3==0) {
+            if(timeStep1!=(int)timepass) {
+        r = (generate_canonical<float, 3>(gen)) ;
+        g = (generate_canonical<float, 3>(gen));
+        b = (generate_canonical<float, 3>(gen));
+        z = (generate_canonical<float, 3>(gen));
         // Set lights properties
-        glm::vec3 lightColor;
-        lightColor.x = sin(glfwGetTime() * 2.0f);
-        lightColor.y = sin(glfwGetTime() * 0.7f);
-        lightColor.z = sin(glfwGetTime() * 1.3f);
+        lightColor = glm::vec3(r,g,b);
+            timepass = glfwGetTime();
+            }
+            
+        }
+        }
         
-        glm::vec3 diffuseColor = lightColor * glm::vec3(1.5f); // Decrease the influence
-        glm::vec3 ambientColor = diffuseColor * glm::vec3(1.2f); // Low influence
+        glm::vec3 diffuseColor = lightColor * glm::vec3(diffuseColorEffect); // Decrease the influence
+        glm::vec3 ambientColor = diffuseColor * glm::vec3(ambientColorEffect); // Low influence
+        
+        //setting the lights attributes
+        glUniform3f(glGetUniformLocation(ourProgram, "light.position"),  -lightPos.x, -lightPos.y, -lightPos.z);
         glUniform3f(glGetUniformLocation(ourProgram, "light.ambient"),  ambientColor.x, ambientColor.y, ambientColor.z);
         glUniform3f(glGetUniformLocation(ourProgram, "light.diffuse"),  diffuseColor.x, diffuseColor.y, diffuseColor.z);
         glUniform3f(glGetUniformLocation(ourProgram, "light.specular"), 1.0f, 1.0f, 1.0f);
         
+        // getting the materials location
         GLint matAmbientLoc  = glGetUniformLocation(ourProgram, "material.ambient");
         GLint matDiffuseLoc  = glGetUniformLocation(ourProgram, "material.diffuse");
         GLint matSpecularLoc = glGetUniformLocation(ourProgram, "material.specular");
         GLint matShineLoc    = glGetUniformLocation(ourProgram, "material.shininess");
         
-        glUniform3f(matAmbientLoc,  1.0f, 0.5f, 0.31f);
-        glUniform3f(matDiffuseLoc,   1.0f, 0.5f, 0.31f);
-        glUniform3f(matSpecularLoc,  0.5f, 0.5f, 0.5f);
-        glUniform1f(matShineLoc,    32.0f);
+        //emerald vase
+        //set the material properties
+        glUniform3f(matAmbientLoc,  0.0215f, 0.1745f, 0.0215f);
+        glUniform3f(matDiffuseLoc,   0.07568f, 0.61424f, 0.07568f);
+        glUniform3f(matSpecularLoc,  0.633f, 0.727811f, 0.633f);
+        glUniform1f(matShineLoc,    0.6f);
 
-
+        //model, view, projection
         glm::mat4 view;
         view = camera.GetViewMatrix();
         glm::mat4 projection = glm::perspective(camera.Zoom, (GLfloat)WIDTH / (GLfloat)HEIGHT, 0.1f, 100.0f);
@@ -379,15 +406,14 @@ int main(int argc, const char * argv[]) {
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
         
-        // Draw the vase
+        // Draw the vase(or many vases?)
+        
         for(int num = 0;num < recNum; num++) {
         glBindVertexArray(VAOs[num]);
         glm::mat4 model;
-//        glm::mat4 model = glm::translate(model, glm::vec3(1.0f, 1.0f, 0.0f));
-//        model = glm::rotate(model, (GLfloat)glfwGetTime() * 10.0f, glm::vec3(0.5f, 1.0f, 0.0f));
         model = glm::scale(model,glm::vec3(0.05f, 0.05f, 0.05f));
+        model = glm::rotate(model, 270.0f, glm::vec3(1.0f, 1.0f, 0.0f));
         glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-            
         glDrawElements(GL_TRIANGLES, 6,GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
         }
@@ -398,13 +424,14 @@ int main(int argc, const char * argv[]) {
         modelLoc = glGetUniformLocation(LampProgram, "model");
         viewLoc  = glGetUniformLocation(LampProgram, "view");
         projLoc  = glGetUniformLocation(LampProgram, "projection");
+        
+        glUniform4f(glGetUniformLocation(LampProgram, "currentColor"), lightColor.x,lightColor.y,lightColor.z,z);
         // Set matrices
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
         glm::mat4 model; model = glm::mat4();
         model = glm::translate(model, lightPos);
         model = glm::scale(model, glm::vec3(0.25f)); // Make it a smaller cube
-        model = glm::rotate(model, (GLfloat)glfwGetTime() * 10.0f, glm::vec3(1.0f, 1.0f, 1.0f));
         glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
         // Draw the light object (using light's vertex attributes)
         glBindVertexArray(lightVAO);
@@ -425,8 +452,14 @@ int main(int argc, const char * argv[]) {
 // Is called whenever a key is pressed/released via GLFW
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode)
 {
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+    if (key == GLFW_KEY_Q && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GL_TRUE);
+    if(key== GLFW_KEY_E && action == GLFW_PRESS) {
+        start = 1;
+    }
+    if(key== GLFW_KEY_R && action == GLFW_PRESS) {
+        start = 0;
+    }
     if (key >= 0 && key < 1024)
     {
         if (action == GLFW_PRESS)
@@ -435,6 +468,8 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
             keys[key] = false;
     }
 }
+
+// method to control the movement
 
 void do_movement()
 {
@@ -451,6 +486,7 @@ void do_movement()
 
 bool firstMouse = true;
 
+// method for mouse control
 void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 {
     if (firstMouse)
