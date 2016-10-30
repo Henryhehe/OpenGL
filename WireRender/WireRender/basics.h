@@ -30,11 +30,26 @@ const int ROTATENUM = 360/ROTATEDEGREE;
 struct vertex {
     glm::vec3 position;
     glm::vec3 normal;
-    glm::vec2 texcoord;
 };
 
-struct face{
+struct recFace {
+    glm::vec3 position1;
+    glm::vec3 position2;
+    glm::vec3 position3;
+    glm::vec3 position4;
+    glm::vec3 normal;
+};
+
+// this method will take in three points and calculate the normal vector out of it
+glm::vec3 getNormal(glm::vec3 point1,glm::vec3 point2,glm::vec3 point3) {
+    glm::vec3 normal;
+    glm::vec3 edge12 = point2 - point1;
+    glm::vec3 edge13 = point3 - point1;
+    glm::vec3 cross = glm::cross(edge12,edge13);
+    normal = cross/ (glm::length(cross));
+//    cout << edge12.x << edge12.y << edge12.z << endl;
     
+    return normal;
 };
 
 vector<vector<vertex>> readProfiles() {
@@ -77,8 +92,8 @@ vector<vector<vertex>> readProfiles() {
             float degree = j*ROTATEDEGREE;
             rx = firstPoint.position.x*cos(degree*(PI/180)) - firstPoint.position.y*sin(degree*(PI/180));
             ry = firstPoint.position.x*sin(degree*(PI/180)) + firstPoint.position.y*cos(degree*(PI/180));
-            rz = 0;
-            glm::vec3 rotatePosition = glm::vec3(rx,rx,rz);
+            rz = firstPoint.position.z;
+            glm::vec3 rotatePosition = glm::vec3(rx,ry,rz);
             vertex rotateVertex;
             rotateVertex.position = rotatePosition;
             (*i).push_back(rotateVertex);
